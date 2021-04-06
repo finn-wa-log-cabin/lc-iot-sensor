@@ -1,16 +1,5 @@
-#include <Adafruit_Sensor.h>
-#include <ArduinoJson.h>
-#include <DHT.h>
-#include <DHT_U.h>
-#include <DNSServer.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266WiFi.h>
-#include <WiFiManager.h>
-#include <ezTime.h>
+#include "main.h"
 
-#define ISO8601_MS "Y-m-d\\TH:i:s.vO"
-
-#define DHTPIN 2 // Digital pin connected to the DHT sensor
 DHT_Unified dht(DHTPIN, DHT11);
 
 const unsigned long TIME_SECOND = 1000UL;
@@ -23,7 +12,7 @@ char jsonStr[256] = {0};
 sensors_event_t temperature;
 sensors_event_t humidity;
 char timestamp[16] = {0};
-int msgCount = 0;
+int messageCount = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -58,11 +47,11 @@ void updateTimestamp() { sprintf(timestamp, "%ld%03d", now(), ms()); }
 
 void serialize() {
   StaticJsonDocument<256> doc;
-  doc["version"] = "1.0.0";
-  doc["customerID"] = "TestCustomer";
-  doc["deviceID"] = "TestDevice1";
+  doc["version"] = VERSION;
+  doc["customerID"] = CUSTOMER_ID;
+  doc["deviceID"] = DEVICE_ID;
+  doc["messageCount"] = messageCount;
   JsonObject sensorData = doc.createNestedObject("sensorData");
-  doc["messageCount"] = msgCount;
   sensorData["humidity"] = humidity.relative_humidity;
   sensorData["temperature"] = temperature.temperature;
   sensorData["timestamp"] = timestamp;
@@ -74,7 +63,7 @@ void loop() {
   events();
   if (millis() - previousMillis >= INTERVAL) {
     previousMillis = millis();
-    msgCount++;
+    messageCount++;
     updateReadings();
     updateTimestamp();
     serialize();
