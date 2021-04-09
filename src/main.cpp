@@ -1,26 +1,27 @@
 #include "main.h"
 
 DHT_Unified dht(DHTPIN, DHT11);
-
-const unsigned long TIME_SECOND = 1000UL;
-const unsigned long TIME_MINUTE = 60UL * TIME_SECOND;
-const unsigned long TIME_HOUR = 60UL * TIME_MINUTE;
-const unsigned long INTERVAL = 5UL * TIME_SECOND;
+WiFiClient net;
+MQTTClient client;
 unsigned long previousMillis = 0;
 
-char jsonStr[256] = {0};
 sensors_event_t temperature;
 sensors_event_t humidity;
 char timestamp[16] = {0};
 int messageCount = 0;
 
-void setup() {
-  Serial.begin(115200);
-  dht.begin();
-
+void initWiFiManager() {
   WiFiManager wifiManager;
   wifiManager.autoConnect("IOT Sensor");
+  Serial.print("Confirming WiFi connection...");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.println(" Done.");
+}
 
+void initNtp() {
   // Wait for NTP server to connect for the first time
   setDebug(INFO);
   waitForSync();
@@ -40,13 +41,13 @@ void updateReadings() {
 }
 
 /**
- * Creates a millisecond-based Unix timestamp stored in a string to avoid
- * 64-bit calculations
+ * Creates a millisecond-based Unix timestamp stored in a string to avoid 64-bit
+ * calculations
  */
 void updateTimestamp() { sprintf(timestamp, "%ld%03d", now(), ms()); }
 
 void serialize() {
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<192> doc;
   doc["version"] = VERSION;
   doc["customerID"] = CUSTOMER_ID;
   doc["deviceID"] = DEVICE_ID;
@@ -55,15 +56,59 @@ void serialize() {
   sensorData["humidity"] = humidity.relative_humidity;
   sensorData["temperature"] = temperature.temperature;
   sensorData["timestamp"] = timestamp;
-  serializeJson(doc, jsonStr);
-  Serial.println(jsonStr);
+  char buffer[192];
+  size_t n = serializeJson(doc, buffer);
+  // TODO: If I send the real buffer, it disconnects
+  client.publish("hellochen", "buffer"); // n);
+}
+
+void connect() {
+  Serial.print("checking wifi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.print("\nconnecting...");
+  while (!client.connect("arduino", "public", "public")) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.println("\nconnected!");
+  client.subscribe("/hellochen");
+}
+
+void messageReceived(String &topic, String &payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
+}
+
+void initMqtt() {
+  client.begin("public.cloud.shiftr.io", net);
+  client.onMessage(messageReceived);
+  connect();
+}
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  initWiFiManager();
+  initNtp();
+  initMqtt();
 }
 
 void loop() {
   events();
+  client.loop();
+  delay(10); // <- fixes some issues with WiFi stability
+
+  if (!client.connected()) {
+    connect();
+  }
+
   if (millis() - previousMillis >= INTERVAL) {
     previousMillis = millis();
     messageCount++;
+    Serial.println(messageCount);
+
     updateReadings();
     updateTimestamp();
     serialize();

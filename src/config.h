@@ -3,7 +3,7 @@ const unsigned long MINUTE = 60UL * SECOND;
 const unsigned long HOUR = 60UL * MINUTE;
 
 // Interval time(ms) for sending message to IoT Hub
-const unsigned long INTERVAL = 30UL * SECOND;
+const unsigned long INTERVAL = 10UL * SECOND;
 
 // Telemetry message interface version
 const char *VERSION = "1.0.0";
