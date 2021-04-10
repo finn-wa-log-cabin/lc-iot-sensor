@@ -1,8 +1,10 @@
 #include "main.h"
 
 DHT_Unified dht(DHTPIN, DHT11);
-WiFiClient wiFiClient;
-PubSubClient mqttClient(wiFiClient);
+WiFiClientSecure wifiClient;
+PubSubClient mqttClient(wifiClient);
+const char fingerprint[] PROGMEM =
+    "86:0C:BF:40:65:3A:65:E5:F3:36:8C:9C:85:13:9B:A8:60:28:74:BF";
 
 unsigned long previousMillis = 0;
 
@@ -20,6 +22,7 @@ void initWiFiManager() {
     delay(1000);
   }
   Serial.println(" Done.");
+  wifiClient.setFingerprint(fingerprint);
 }
 
 void initNtp() {
@@ -95,7 +98,7 @@ void messageReceived(char *topic, byte *payload, unsigned int length) {
 }
 
 void initMqtt() {
-  mqttClient.setServer("public.cloud.shiftr.io", 1883);
+  mqttClient.setServer("public.cloud.shiftr.io", 8883);
   mqttClient.setCallback(messageReceived);
 }
 
