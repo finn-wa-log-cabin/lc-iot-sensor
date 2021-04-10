@@ -1,8 +1,9 @@
 #include "main.h"
 
 DHT_Unified dht(DHTPIN, DHT11);
-WiFiClient net;
-MQTTClient client;
+WiFiClient wiFiClient;
+PubSubClient mqttClient(wiFiClient);
+
 unsigned long previousMillis = 0;
 
 sensors_event_t temperature;
@@ -58,8 +59,7 @@ void serialize() {
   sensorData["timestamp"] = timestamp;
   char buffer[192];
   size_t n = serializeJson(doc, buffer);
-  // TODO: If I send the real buffer, it disconnects
-  client.publish("hellochen", "buffer"); // n);
+  mqttClient.publish("hellochen", buffer, n);
 }
 
 void connect() {
@@ -68,23 +68,35 @@ void connect() {
     Serial.print(".");
     delay(1000);
   }
-  Serial.print("\nconnecting...");
-  while (!client.connect("arduino", "public", "public")) {
-    Serial.print(".");
-    delay(1000);
+  // Loop until we're reconnected
+  while (!mqttClient.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (mqttClient.connect("arduino", "public", "public")) {
+      Serial.println("connected");
+      mqttClient.subscribe("hellochen");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqttClient.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
   }
-  Serial.println("\nconnected!");
-  client.subscribe("/hellochen");
 }
 
-void messageReceived(String &topic, String &payload) {
-  Serial.println("incoming: " + topic + " - " + payload);
+void messageReceived(char *topic, byte *payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
 }
 
 void initMqtt() {
-  client.begin("public.cloud.shiftr.io", net);
-  client.onMessage(messageReceived);
-  connect();
+  mqttClient.setServer("public.cloud.shiftr.io", 1883);
+  mqttClient.setCallback(messageReceived);
 }
 
 void setup() {
@@ -97,12 +109,10 @@ void setup() {
 
 void loop() {
   events();
-  client.loop();
-  delay(10); // <- fixes some issues with WiFi stability
-
-  if (!client.connected()) {
+  if (!mqttClient.connected()) {
     connect();
   }
+  mqttClient.loop();
 
   if (millis() - previousMillis >= INTERVAL) {
     previousMillis = millis();
