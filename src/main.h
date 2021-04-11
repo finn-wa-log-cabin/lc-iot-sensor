@@ -8,4 +8,5 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <WiFiManager.h>
+#include <coredecls.h>
 #include <ezTime.h>

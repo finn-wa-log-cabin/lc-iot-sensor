@@ -3,9 +3,6 @@
 DHT_Unified dht(DHTPIN, DHT11);
 WiFiClientSecure wifiClient;
 PubSubClient mqttClient(wifiClient);
-const char fingerprint[] PROGMEM =
-    "86:0C:BF:40:65:3A:65:E5:F3:36:8C:9C:85:13:9B:A8:60:28:74:BF";
-
 unsigned long previousMillis = 0;
 
 sensors_event_t temperature;
@@ -22,7 +19,6 @@ void initWiFiManager() {
     delay(1000);
   }
   Serial.println(" Done.");
-  wifiClient.setFingerprint(fingerprint);
 }
 
 void initNtp() {
@@ -62,7 +58,7 @@ void serialize() {
   sensorData["timestamp"] = timestamp;
   char buffer[192];
   size_t n = serializeJson(doc, buffer);
-  mqttClient.publish("hellochen", buffer, n);
+  mqttClient.publish(TOPIC, buffer, n);
 }
 
 void connect() {
@@ -74,9 +70,11 @@ void connect() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
     Serial.print("Attempting MQTT connection...");
-    if (mqttClient.connect("arduino", "public", "public")) {
+    // This esp8266 var is used to verify certificate validity
+    // but it is not set by ezTime so we set it manually
+    sntp_real_timestamp = now();
+    if (mqttClient.connect(DEVICE_ID, USERNAME, PWD)) {
       Serial.println("connected");
-      mqttClient.subscribe("hellochen");
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
@@ -98,7 +96,11 @@ void messageReceived(char *topic, byte *payload, unsigned int length) {
 }
 
 void initMqtt() {
-  mqttClient.setServer("public.cloud.shiftr.io", 8883);
+  if (!wifiClient.setCACert((const uint8_t *)ca_pem, ca_pem_len)) {
+    Serial.println("setCACert() FAILED");
+    return;
+  }
+  mqttClient.setServer(HOST, PORT);
   mqttClient.setCallback(messageReceived);
 }
 
