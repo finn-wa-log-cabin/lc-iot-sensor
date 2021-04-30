@@ -7,7 +7,6 @@ unsigned long previousMillis = 0;
 
 sensors_event_t temperature;
 sensors_event_t humidity;
-char timestamp[16] = {0};
 int messageCount = 0;
 
 void initWiFiManager() {
@@ -40,12 +39,6 @@ void updateReadings() {
   }
 }
 
-/**
- * Creates a millisecond-based Unix timestamp stored in a string to avoid 64-bit
- * calculations
- */
-void updateTimestamp() { sprintf(timestamp, "%ld%03d", now(), ms()); }
-
 void serialize() {
   StaticJsonDocument<192> doc;
   doc["version"] = VERSION;
@@ -55,7 +48,7 @@ void serialize() {
   JsonObject sensorData = doc.createNestedObject("sensorData");
   sensorData["humidity"] = humidity.relative_humidity;
   sensorData["temperature"] = temperature.temperature;
-  sensorData["timestamp"] = timestamp;
+  sensorData["timestamp"] = now();
   char buffer[192];
   size_t n = serializeJson(doc, buffer);
   mqttClient.publish(TOPIC, buffer, n);
@@ -85,23 +78,20 @@ void connect() {
   }
 }
 
-void messageReceived(char *topic, byte *payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-}
-
 void initMqtt() {
   if (!wifiClient.setCACert((const uint8_t *)ca_pem, ca_pem_len)) {
     Serial.println("setCACert() FAILED");
     return;
   }
   mqttClient.setServer(HOST, PORT);
-  mqttClient.setCallback(messageReceived);
+  mqttClient.setBufferSize(MSG_SIZE);
+  connect();
+}
+
+void sendTelemetry() {
+  Serial.println(messageCount);
+  updateReadings();
+  serialize();
 }
 
 void setup() {
@@ -110,6 +100,8 @@ void setup() {
   initWiFiManager();
   initNtp();
   initMqtt();
+  // Send first message
+  sendTelemetry();
 }
 
 void loop() {
@@ -122,10 +114,6 @@ void loop() {
   if (millis() - previousMillis >= INTERVAL) {
     previousMillis = millis();
     messageCount++;
-    Serial.println(messageCount);
-
-    updateReadings();
-    updateTimestamp();
-    serialize();
+    sendTelemetry();
   }
 }

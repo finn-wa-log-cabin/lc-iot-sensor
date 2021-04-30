@@ -1,11 +1,9 @@
-#include "secrets.h"
-
 const unsigned long SECOND = 1000UL;
 const unsigned long MINUTE = 60UL * SECOND;
 const unsigned long HOUR = 60UL * MINUTE;
 
 // Interval time(ms) for sending message to IoT Hub
-const unsigned long INTERVAL = 1UL * MINUTE;
+const unsigned long INTERVAL = 15UL * MINUTE;
 
 // Telemetry message interface version
 const char *VERSION = "1.0.0";
@@ -18,8 +16,9 @@ const char *DEVICE_ID = "FeatherHuzzah1";
 #define DHTPIN 2
 
 // CONNECTION information to complete
-#define IOTHUBNAME "WaterTankMonitors"
+#define IOTHUBNAME "iot-lc"
 #define DEVICEID "FeatherHuzzah1"
+#define MSG_SIZE 1024
 
 // computed Host Username and Topic
 #define USERNAME                                                               \
@@ -28,3 +27,5 @@ const char *DEVICE_ID = "FeatherHuzzah1";
 #define PORT 8883
 #define HOST IOTHUBNAME ".azure-devices.net"
 #define TOPIC "devices/" DEVICEID "/messages/events/"
+// const char *PWD = <SAS TOKEN>
+#include "secret.h"
